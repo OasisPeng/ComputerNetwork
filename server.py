@@ -54,7 +54,7 @@ def run_server(host, port):
             print(client_socket)
             print(f"Accepted connection from {addr[0]}:{addr[1]}")
 
-            # 处理每个客户端连接的线程
+            # 使用线程处理每个连接，实现并发处理
             client_handler = threading.Thread(target=handle_client, args=(client_socket,))
             client_handler.start()
 

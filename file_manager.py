@@ -26,9 +26,9 @@ class FileManager:
         else:
             return None
 
-    def upload_file(self, relative_path, content):
+    def upload_file(self, relative_path, content, default_filename="default.txt"):
         # 上传文件到指定路径
-        absolute_path = os.path.join(self.base_path, relative_path)
+        absolute_path = os.path.join(self.base_path, relative_path, default_filename)
 
         # 创建目录
         os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
@@ -47,4 +47,11 @@ class FileManager:
 
 if __name__ == "__main__":
     # 在这里可以添加一些测试代码
-    pass
+    file_manager = FileManager(base_path="./data")
+
+    # 指定上传的相对路径和文件内容
+    relative_path = "12111548/"
+    content = b"Hello, this is a test file content."
+
+    # 调用 upload_file 方法上传文件
+    file_manager.upload_file(relative_path, content)
