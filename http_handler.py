@@ -4,9 +4,11 @@ import base64
 import urllib.parse
 import cgi
 from io import BytesIO
+
+from chunked_transfer import ChunkedTransfer
 from file_manager import FileManager
 from session_manager import SessionManager
-
+from chunked_transfer import ChunkedTransfer
 # 用于存储用户的用户名和密码信息
 # 实际项目中应该使用更安全的存储方式，例如数据库
 user_credentials = {"client1": "123", "client2": "123", "client3": "123"}
@@ -119,38 +121,68 @@ def get_request_body(request_lines):
 
 
 def handle_get_request(request_path):
-    # 处理GET请求
-    # 根据 request_path 处理文件查看或下载等操作
-    # 解析请求路径
+    # 检查路径并执行相应的操作
     try:
         access_path = urllib.parse.unquote(request_path[1:])
     except UnicodeDecodeError:
-        # 请求路径不是有效的UTF-8编码，返回 400 Bad Request
         return generate_response(400, "Bad Request")
+
     # 初始化文件管理器
     file_manager = FileManager(base_path="./data")
-    # 列出目录
-    files = file_manager.list_directory(access_path)
-    if files is not None:
-        # 请求路径为目录，返回文件列表
-        response_body = generate_directory_listing(access_path, files)
-        return generate_response(200, "OK", response_body)
-    else:
-        # 请求路径为文件，返回文件内容
-        file_content = file_manager.read_file(access_path)
 
-        if file_content is not None:
-            # 获取文件的 MIME 类型
-            mime_type, _ = mimetypes.guess_type(access_path)
-
-            response_headers = {
-                "Content-Type": mime_type,
-                "Content-Disposition": f"attachment; filename={os.path.basename(access_path)}"
-            }
-            return generate_response(200, "OK", file_content, response_headers)
+    # 如果是目录，则列出目录内容
+    if file_manager.is_directory(access_path):
+        files = file_manager.list_directory(access_path)
+        if files is not None:
+            response_body = generate_directory_listing(access_path, files)
+            return generate_response(200, "OK", response_body)
         else:
-            # 文件不存在，返回 404 Not Found
             return generate_response(404, "Not Found")
+
+    # 如果是文件，则使用分块传输
+    elif file_manager.is_file(access_path):
+        # 确定文件路径
+        file_path = file_manager.get_full_path(access_path)
+
+        # 使用分块传输
+        chunked_transfer = ChunkedTransfer(file_path)
+        if chunked_transfer is not None:
+            headers = {
+                "Transfer-Encoding": "chunked",
+                "Content-Type": "application/octet-stream",  # 或其他合适的 MIME 类型
+            }
+            response = generate_response(200, "OK", headers=headers)
+
+            # 对于分块传输，您需要发送每个块的大小，然后是块内容，最后是块结束标志
+            for chunk in chunked_transfer:
+                if chunk is None:
+                    return generate_response(404, "Not Found")
+                response += f"{len(chunk):X}\r\n"
+                response += chunk.decode('latin-1')  # 用 latin-1 解码二进制数据
+                response += "\r\n"
+            response += "0\r\n\r\n"  # 发送结束块
+            return response
+        else:
+            return generate_response(404, "Not Found")
+
+    else:
+        # 如果既不是目录也不是文件，则返回 404
+        return generate_response(404, "Not Found")
+        # # 请求路径为文件，返回文件内容
+        # file_content = file_manager.read_file(access_path)
+        #
+        # if file_content is not None:
+        #     # 获取文件的 MIME 类型
+        #     mime_type, _ = mimetypes.guess_type(access_path)
+        #
+        #     response_headers = {
+        #         "Content-Type": mime_type,
+        #         "Content-Disposition": f"attachment; filename={os.path.basename(access_path)}"
+        #     }
+        #     return generate_response(200, "OK", file_content, response_headers)
+        # else:
+        #     # 文件不存在，返回 404 Not Found
+        #     return generate_response(404, "Not Found")
 
 
 def handle_head_request(request_path):
