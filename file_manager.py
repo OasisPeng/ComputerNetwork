@@ -44,6 +44,18 @@ class FileManager:
         if os.path.isfile(absolute_path):
             os.remove(absolute_path)
 
+    def is_file(self, relative_path):
+        # 检查相对路径是否指向一个文件
+        return os.path.isfile(os.path.join(self.base_path, relative_path))
+
+    def get_full_path(self, relative_path):
+        # 获取文件或目录的完整路径
+        return os.path.join(self.base_path, relative_path)
+
+    def is_directory(self, relative_path):
+        # 检查相对路径是否指向一个目录
+        return os.path.isdir(os.path.join(self.base_path, relative_path))
+
 
 if __name__ == "__main__":
     # 在这里可以添加一些测试代码
