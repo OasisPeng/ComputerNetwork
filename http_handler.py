@@ -9,6 +9,7 @@ from chunked_transfer import ChunkedTransfer
 from file_manager import FileManager
 from session_manager import SessionManager
 from chunked_transfer import ChunkedTransfer
+
 # 用于存储用户的用户名和密码信息
 # 实际项目中应该使用更安全的存储方式，例如数据库
 user_credentials = {"client1": "123", "client2": "123", "client3": "123"}
@@ -43,7 +44,7 @@ def handle_http_request(http_request):
             if session_info and session_cookie and session_manager.is_session_valid(username, session_cookie):
                 # 用户有有效的会话信息且请求中包含有效的 session-id Cookie
                 if request_method == "GET":
-                    return handle_get_request(request_path)
+                    return handle_get_request(request_path, request_lines)
                 elif request_method == "HEAD":
                     return handle_head_request(request_path)
                 elif request_method == "POST":
@@ -120,7 +121,7 @@ def get_request_body(request_lines):
     return request_body
 
 
-def handle_get_request(request_path):
+def handle_get_request(request_path, request_lines):
     # 检查路径并执行相应的操作
     try:
         access_path = urllib.parse.unquote(request_path[1:])
@@ -141,29 +142,37 @@ def handle_get_request(request_path):
 
     # 如果是文件，则使用分块传输
     elif file_manager.is_file(access_path):
-        # 确定文件路径
-        file_path = file_manager.get_full_path(access_path)
-
-        # 使用分块传输
-        chunked_transfer = ChunkedTransfer(file_path)
-        if chunked_transfer is not None:
-            headers = {
-                "Transfer-Encoding": "chunked",
-                "Content-Type": "application/octet-stream",  # 或其他合适的 MIME 类型
-            }
-            response = generate_response(200, "OK", headers=headers)
-
-            # 对于分块传输，您需要发送每个块的大小，然后是块内容，最后是块结束标志
-            for chunk in chunked_transfer:
-                if chunk is None:
-                    return generate_response(404, "Not Found")
-                response += f"{len(chunk):X}\r\n"
-                response += chunk.decode('latin-1')  # 用 latin-1 解码二进制数据
-                response += "\r\n"
-            response += "0\r\n\r\n"  # 发送结束块
-            return response
+        # 检查是否有 Range 请求头
+        range_header = get_range_header(request_lines)
+        if range_header:
+            if "," in range_header:  # 多重范围请求
+                return handle_multiple_range_request(access_path, range_header)
+            else:  # 单一范围请求
+                return handle_range_request(access_path, range_header)
         else:
-            return generate_response(404, "Not Found")
+            # 确定文件路径
+            file_path = file_manager.get_full_path(access_path)
+
+            # 使用分块传输
+            chunked_transfer = ChunkedTransfer(file_path)
+            if chunked_transfer is not None:
+                headers = {
+                    "Transfer-Encoding": "chunked",
+                    "Content-Type": "application/octet-stream",  # 或其他合适的 MIME 类型
+                }
+                response = generate_response(200, "OK", headers=headers)
+
+                # 对于分块传输，您需要发送每个块的大小，然后是块内容，最后是块结束标志
+                for chunk in chunked_transfer:
+                    if chunk is None:
+                        return generate_response(404, "Not Found")
+                    response += f"{len(chunk):X}\r\n"
+                    response += chunk.decode('latin-1')  # 用 latin-1 解码二进制数据
+                    response += "\r\n"
+                response += "0\r\n\r\n"  # 发送结束块
+                return response
+            else:
+                return generate_response(404, "Not Found")
 
     else:
         # 如果既不是目录也不是文件，则返回 404
@@ -314,6 +323,107 @@ def generate_directory_listing(current_path, files):
 
     listing += "</ul></body></html>"
     return listing
+
+
+def handle_range_request(access_path, range_header):
+    file_manager = FileManager(base_path="./data")
+
+    start_byte, end_byte = parse_range_header(range_header)
+    file_path = file_manager.get_full_path(access_path)
+    file_size = os.path.getsize(file_path)
+
+    if start_byte is None or end_byte is None or start_byte > end_byte or end_byte >= file_size:
+        return generate_response(416, "Range Not Satisfiable")
+
+    with open(file_path, 'rb') as file:
+        file.seek(start_byte)
+        content = file.read(end_byte - start_byte + 1)
+
+    content_range_header = f"bytes {start_byte}-{end_byte}/{file_size}"
+    headers = {
+        "Content-Range": content_range_header,
+        "Content-Length": str(len(content)),
+        "Content-Type": "application/octet-stream"
+    }
+
+    return generate_response(206, "Partial Content", content, headers)
+
+
+def get_range_header(request_lines):
+    # 从请求头部获取Range头部信息
+    for line in request_lines:
+        if line.startswith("Range:"):
+            return line[len("Range:"):].strip()
+    return None
+
+
+def parse_range_header(range_header):
+    if range_header:
+        # 解析范围格式，例如 "bytes=0-499"
+        range_type, range_values = range_header.split('=')
+        if range_type == 'bytes':
+            start_str, end_str = range_values.split('-')
+            start_byte = int(start_str) if start_str else None
+            end_byte = int(end_str) if end_str else None
+            return start_byte, end_byte
+    return None, None
+
+
+def handle_multiple_range_request(file_path, range_header):
+    # 分析 Range 头以获得多个范围
+    ranges = parse_multiple_ranges(range_header)
+    file_size = os.path.getsize(file_path)
+    boundary = "3d6b6a416f9b5"  # 边界字符串，可以是任意唯一字符串
+    content_parts = []
+
+    for start, end in ranges:
+        if start > end or end >= file_size:
+            continue  # 忽略无效范围
+
+        # 读取并存储每个范围的内容
+        with open(file_path, 'rb') as file:
+            file.seek(start)
+            content = file.read(end - start + 1)
+            content_range_header = f"bytes {start}-{end}/{file_size}"
+            content_parts.append((content, content_range_header))
+
+    # 创建多部分响应体
+    multipart_content = create_multipart_content(content_parts, boundary)
+
+    # 设置响应头
+    headers = {
+        "Content-Type": f"multipart/byteranges; boundary={boundary}",
+        "Content-Length": str(len(multipart_content))
+    }
+
+    return generate_response(206, "Partial Content", multipart_content, headers)
+
+
+def create_multipart_content(content_parts, boundary):
+    # 构建多部分响应体
+    parts = []
+    for content, content_range in content_parts:
+        part = f"--{boundary}\r\n"
+        part += "Content-Type: application/octet-stream\r\n"
+        part += f"Content-Range: {content_range}\r\n\r\n"
+        part += content.decode('latin-1')  # 用 latin-1 解码二进制数据
+        part += "\r\n"
+        parts.append(part)
+    parts.append(f"--{boundary}--\r\n")
+    return "".join(parts)
+
+
+def parse_multiple_ranges(range_header):
+    # 解析多重范围
+    _, range_values = range_header.split('=')
+    ranges = range_values.split(',')
+    parsed_ranges = []
+    for range in ranges:
+        start_str, end_str = range.split('-')
+        start_byte = int(start_str) if start_str else None
+        end_byte = int(end_str) if end_str else None
+        parsed_ranges.append((start_byte, end_byte))
+    return parsed_ranges
 
 
 if __name__ == "__main__":
