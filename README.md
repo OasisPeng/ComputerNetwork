@@ -31,3 +31,7 @@
 ### client.py
 
 模拟客户端发送请求
+
+### HttpRequest和HttpResponse
+
+对请求和响应进行了封装

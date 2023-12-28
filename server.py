@@ -26,8 +26,9 @@ def handle_client(client_socket):
             client_socket.send(http_response.encode('utf-8'))
 
             # # 检查是否需要关闭连接
-            # if "Connection: Close" in http_request:
-            break
+            if "Connection: Close" in http_request:
+                client_socket.close()
+            # break
     except (ConnectionResetError, socket.error):
         # 客户端关闭连接引发异常
         print("Client closed the connection.")
@@ -37,7 +38,8 @@ def handle_client(client_socket):
 
     finally:
         # 关闭客户端连接
-        client_socket.close()
+        pass
+        # client_socket.close()
 
 
 def run_server(host, port):
@@ -51,7 +53,7 @@ def run_server(host, port):
     try:
         while True:
             client_socket, addr = server_socket.accept()
-            print(client_socket)
+            print(client_socket)  # 一个连接
             print(f"Accepted connection from {addr[0]}:{addr[1]}")
 
             # 使用线程处理每个连接，实现并发处理

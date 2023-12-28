@@ -11,6 +11,13 @@ class FileManager:
         absolute_path = os.path.join(self.base_path, relative_path)
         if os.path.isdir(absolute_path):
             files = os.listdir(absolute_path)
+
+            # 判断每个文件是否是文件夹，如果是，加上/
+            for i in range(len(files)):
+                file_path = os.path.join(absolute_path, files[i])
+                if os.path.isdir(file_path):
+                    files[i] += '/'
+
             return files
         else:
             return None
@@ -26,9 +33,9 @@ class FileManager:
         else:
             return None
 
-    def upload_file(self, relative_path, content, default_filename="default.txt"):
+    def upload_file(self, relative_path, content, filename):
         # 上传文件到指定路径
-        absolute_path = os.path.join(self.base_path, relative_path, default_filename)
+        absolute_path = os.path.join(self.base_path, relative_path, filename)
 
         # 创建目录
         os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
