@@ -24,7 +24,14 @@ class SessionManager:
         # 获取用户的会话信息
         return self.sessions.get(username)
 
-    def is_session_valid(self, username, session_id):
+    def is_session_valid(self, session_id):
         # 检查会话是否有效
-        session_info = self.sessions.get(username)
-        return session_info and session_info[0] == session_id and session_info[1] > time.time()
+        valid_sessions = [info for info in self.sessions.values() if info[0] == session_id and info[1] > time.time()]
+        return len(valid_sessions) > 0
+
+    def get_username_by_session_id(self, session_id):
+        # 通过 session_id 获取用户名
+        for username, (existing_session_id, _) in self.sessions.items():
+            if existing_session_id == session_id:
+                return username
+        return None

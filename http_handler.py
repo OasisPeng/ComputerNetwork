@@ -23,58 +23,50 @@ def handle_http_request(http_request):
     # 解析HTTP请求
     request = HttpRequest(http_request)
 
-    # 获取请求体
-    if request.authorization_header:
+
+    # 获取请求中的 Cookie
+    session_cookie = get_cookie_value(request.cookie_header, "session-id")
+
+    # 第一次登录，没有cookie
+    if request.authorization_header and session_cookie is None:
         # 解码 Authorization 头部信息
         decoded_info = decode_authorization_header(request.authorization_header)
-        # 检查用户提供的授权信息是否有效
+        # 获取用户的会话信息
+        username, _ = decoded_info.split(":")
+
         if validate_credentials(decoded_info):
-            # 用户提供的授权信息有效，可以继续处理请求
-            # 获取用户的会话信息
-            username, _ = decoded_info.split(":")
-            session_info = session_manager.get_session_info(username)
-
-            # 获取请求中的 Cookie
-            session_cookie = get_cookie_value(request.cookie_header, "session-id")
-
-            if session_info and session_cookie and session_manager.is_session_valid(username, session_cookie):
-                # 用户有有效的会话信息且请求中包含有效的 session-id Cookie
-                if request.method == "GET":
-                    return handle_get_request(request.path, request.request_lines, None)
-                elif request.method == "HEAD":
-                    return handle_head_request(request.path, None)
-                elif request.method == "POST":
-                    # 获取请求主体
-                    return handle_post_request(request.path, decoded_info, http_request, None)
-                else:
-                    return HttpResponse(405, "Method Not Allowed", '', None).response
-            elif session_info and session_cookie:  # 请求中的 session-id 无效或过期
-                return HttpResponse(401, "Unauthorized", '', headers={"WWW-Authenticate": 'Basic '
-                                                                                          'realm="Authorization'
-                                                                                          'Required"'}).response
+            # 用户没有有效的会话信息，生成新的 session-id
+            new_session_id = session_manager.create_session(username)
+            # # 返回响应时设置 Set-Cookie 头部，包含新的 session-id
+            headers = {"Set-Cookie": f"session-id={new_session_id}; HttpOnly"}
+            if request.method == "GET":
+                return handle_get_request(request.path, request.request_lines, new_session_id)
+            elif request.method == "HEAD":
+                return handle_head_request(request.path, new_session_id)
+            elif request.method == "POST":
+                # 获取请求主体
+                return handle_post_request(request.path, decoded_info, http_request, new_session_id)
             else:
-                # 用户没有有效的会话信息，生成新的 session-id
-                new_session_id = session_manager.create_session(username)
-                # # 返回响应时设置 Set-Cookie 头部，包含新的 session-id
-                headers = {"Set-Cookie": f"session-id={new_session_id}; HttpOnly"}
-                if request.method == "GET":
-                    return handle_get_request(request.path, request.request_lines, new_session_id)
-                elif request.method == "HEAD":
-                    return handle_head_request(request.path, new_session_id)
-                elif request.method == "POST":
-                    # 获取请求主体
-                    return handle_post_request(request.path, decoded_info, http_request, new_session_id)
-                else:
-                    return HttpResponse(405, "Method Not Allowed", '', headers).response
+                return HttpResponse(405, "Method Not Allowed", '', headers).response
         else:
-            # 用户提供的授权信息无效，返回 401 Unauthorized
             return HttpResponse(401, "Unauthorized", '', headers={"WWW-Authenticate": 'Basic realm="Authorization '
                                                                                       'Required"'}).response
-
+    # cookie登录
+    elif session_manager.is_session_valid(session_cookie):
+        username = session_manager.get_username_by_session_id(session_cookie)
+        # 用户有有效的会话信息且请求中包含有效的 session-id Cookie
+        if request.method == "GET":
+            return handle_get_request(request.path, request.request_lines, None)
+        elif request.method == "HEAD":
+            return handle_head_request(request.path, None)
+        elif request.method == "POST":
+            # 获取请求主体
+            return handle_post_request(request.path, username, http_request, None)
+        else:
+            return HttpResponse(405, "Method Not Allowed", '', None).response
+    # cookie无效或过期
     else:
-        # 未提供 Authorization 头部信息，返回 401 Unauthorized
         return HttpResponse(401, "Unauthorized", '', headers={"WWW-Authenticate": 'Basic realm="Authorization '
-
                                                                                   'Required"'}).response
 
 
@@ -186,7 +178,7 @@ def handle_get_request(request_path, request_lines, new_session_id):
                     if mime_type and mime_type.startswith('text'):
                         if new_session_id:
                             response_headers = {
-                                "Content-Type":  mime_type,
+                                "Content-Type": mime_type,
                                 "Content-Disposition": f"attachment; filename={os.path.basename(access_path)}",
                                 "Set-Cookie": f"session-id={new_session_id}; HttpOnly"
                             }
@@ -236,7 +228,7 @@ def handle_head_request(request_path, new_session_id):
     return HttpResponse(200, "OK", '', head).response
 
 
-def handle_post_request(request_path, decoded_info, http_request, new_session_id):
+def handle_post_request(request_path, username, http_request, new_session_id):
     if new_session_id is not None:
         head = {"Set-Cookie": f"session-id={new_session_id}; HttpOnly"}
     else:
@@ -247,15 +239,15 @@ def handle_post_request(request_path, decoded_info, http_request, new_session_id
 
     # 检查是否是上传请求
     if request_path.startswith("/upload"):
-        return handle_upload_request(request_path, decoded_info, http_request, head)
+        return handle_upload_request(request_path, username, http_request, head)
     elif request_path.startswith("/delete"):
-        return handle_delete_request(request_path, decoded_info, head)
+        return handle_delete_request(request_path, username, head)
     else:
         # 如果不是上传请求，返回 405 Method Not Allowed
         return HttpResponse(405, "Method Not Allowed", '', head).response
 
 
-def handle_upload_request(request_path, decoded_info, http_request, head):
+def handle_upload_request(request_path, username, http_request, head):
     # 获取上传目录路径
     query_param = urllib.parse.parse_qs(urllib.parse.urlparse(request_path).query)
     if query_param == {}:
@@ -263,8 +255,6 @@ def handle_upload_request(request_path, decoded_info, http_request, head):
     upload_path = query_param.get("path", None)[0]
     if upload_path is None:
         return HttpResponse(400, "Bad Request", '', head).response
-    # 获取用户权限信息
-    username, _ = decoded_info.split(":")
 
     # 检查用户是否有权限上传到目标目录
     if username != upload_path.strip("/"):
@@ -307,7 +297,7 @@ def handle_upload_request(request_path, decoded_info, http_request, head):
     return HttpResponse(200, "OK", "File uploaded successfully", head).response
 
 
-def handle_delete_request(request_path, decoded_info, head):
+def handle_delete_request(request_path, username, head):
     # 获取删除文件的路径
 
     query_param = urllib.parse.parse_qs(urllib.parse.urlparse(request_path).query)
@@ -317,8 +307,6 @@ def handle_delete_request(request_path, decoded_info, head):
     if delete_path is None:
         return HttpResponse(400, "Bad Request", '', head).response
 
-    # 获取用户权限信息
-    username, _ = decoded_info.split(":")
     # 检查用户是否有权限删除目标文件
     if username != delete_path.strip("/").split("/")[0]:
         return HttpResponse(403, "Forbidden", '', head).response
