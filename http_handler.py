@@ -22,8 +22,6 @@ session_manager = SessionManager()
 def handle_http_request(http_request):
     # 解析HTTP请求
     request = HttpRequest(http_request)
-
-
     # 获取请求中的 Cookie
     session_cookie = get_cookie_value(request.cookie_header, "session-id")
 
@@ -66,7 +64,7 @@ def handle_http_request(http_request):
             return HttpResponse(405, "Method Not Allowed", '', None).response
     # cookie无效或过期
     else:
-        return HttpResponse(401, "Unauthorized", '', headers={"WWW-Authenticate": 'Basic realm="Authorization '
+        return HttpResponse(401, "Unauthorized", login_page(), headers={"WWW-Authenticate": 'Basic realm="Authorization '
                                                                                   'Required"'}).response
 
 
@@ -488,6 +486,26 @@ def parse_content_disposition(content_disposition):
             filename = urllib.parse.unquote(value.strip('\"'))
 
     return disposition, name, filename
+
+
+def login_page():
+    return """
+    <html>
+    <head>
+        <title>Login Page</title>
+    </head>
+    <body>
+        <h2>Login</h2>
+        <form method="post" action="/login">
+            <label for="username">Username:</label>
+            <input type="text" id="username" name="username" required><br>
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required><br>
+            <input type="submit" value="Login">
+        </form>
+    </body>
+    </html>
+    """
 
 
 if __name__ == "__main__":
