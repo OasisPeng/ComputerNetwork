@@ -43,7 +43,7 @@ def handle_http_request(http_request):
                 return handle_head_request(request.path, new_session_id)
             elif request.method == "POST":
                 # 获取请求主体
-                return handle_post_request(request.path, decoded_info, http_request, new_session_id)
+                return handle_post_request(request.path, username, http_request, new_session_id)
             else:
                 return HttpResponse(405, "Method Not Allowed", '', headers).response
         else:
