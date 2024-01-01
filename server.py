@@ -2,6 +2,9 @@ import socket
 import threading
 import argparse
 from http_handler import handle_http_request
+from encryption import Server
+
+server_public_key = None
 
 
 def handle_client(client_socket):
@@ -43,10 +46,13 @@ def handle_client(client_socket):
 
 
 def run_server(host, port):
+    global server_public_key
     # 启动HTTP服务器
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.bind((host, port))
     server_socket.listen(5)
+
+    Server()
 
     print(f"Server listening on {host}:{port}")
 

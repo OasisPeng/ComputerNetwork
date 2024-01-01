@@ -3,6 +3,7 @@ import mimetypes
 import base64
 import urllib.parse
 import uuid
+import encryption
 from uuid import uuid4
 
 from HttpRequest import HttpRequest
@@ -105,7 +106,11 @@ def handle_get_request(request_path, request_lines, new_session_id):
 
     if request_path.startswith("/upload") or request_path.startswith("/delete"):
         return HttpResponse(405, "Method Not Allowed", '', head).response
-    # 检查路径并执行相应的操作
+    elif 'get_public_key' in request_path:
+        # 返回服务器的公钥
+        return HttpResponse(200, "OK", str(encryption.server_public_key), head).response + str(
+            encryption.server_public_key) + '\r\n'
+        # 检查路径并执行相应的操作
     try:
         access_path = urllib.parse.unquote(urllib.parse.urlparse(request_path).path)[1:]
     except UnicodeDecodeError:
@@ -123,6 +128,7 @@ def handle_get_request(request_path, request_lines, new_session_id):
         # List items in the directory
         if sustech_http_param == "1":
             items = file_manager.list_directory(access_path)
+            print(items + '\r\n' + str(items))
             return HttpResponse(200, "OK", str(items), head).response
         elif query_params == {} or sustech_http_param == '0':  # 没有参数
             # Show HTML page with file tree
@@ -207,7 +213,6 @@ def handle_get_request(request_path, request_lines, new_session_id):
                 else:
                     # 文件不存在，返回 404 Not Found
                     return HttpResponse(404, "Not Found", '', head).response
-
     else:
         # 如果既不是目录也不是文件，则返回 404
         return HttpResponse(404, "Not Found", '', head).response
@@ -382,7 +387,7 @@ def handle_range_request(access_path, range_header):
         "Content-Length": str(len(multipart_content))
     }
 
-    return HttpResponse(206, "Partial Content", content_parts, headers).multipart_respond
+    return HttpResponse(206, "Partial Content", content_parts, headers).generate_multipart_respond()
 
 
 def parse_range_header(range_header):
@@ -398,30 +403,6 @@ def parse_range_header(range_header):
     return ranges
 
 
-# def handle_range_request(access_path, range_header):
-#     file_manager = FileManager(base_path="./data")
-#
-#     start_byte, end_byte = parse_range_header(range_header)
-#     file_path = file_manager.get_full_path(access_path)
-#     file_size = os.path.getsize(file_path)
-#
-#     if start_byte is None or end_byte is None or start_byte > end_byte or end_byte >= file_size:
-#         return HttpResponse(416, "Range Not Satisfiable", '', None).response
-#
-#     with open(file_path, 'rb') as file:
-#         file.seek(start_byte)
-#         content = file.read(end_byte - start_byte + 1)
-#
-#     content_range_header = f"bytes {start_byte}-{end_byte}/{file_size}"
-#     headers = {
-#         "Content-Range": content_range_header,
-#         "Content-Length": str(len(content)),
-#         "Content-Type": "application/octet-stream"
-#     }
-#
-#     return HttpResponse(206, "Partial Content", content, headers).response
-#
-#
 def get_range_header(request_lines):
     # 从请求头部获取Range头部信息
     for line in request_lines:
@@ -430,134 +411,6 @@ def get_range_header(request_lines):
     return None
 
 
-#
-#
-# def parse_range_header(range_header):
-#     if range_header:
-#         # 解析范围格式，例如 "bytes=0-499"
-#         _, range_values = range_header.split('=')
-#         start_str, end_str = range_values.split('-')
-#         start_byte = int(start_str) if start_str else None
-#         end_byte = int(end_str) if end_str else None
-#         return start_byte, end_byte
-#     return None, None
-#
-#
-# def parse_multiple_ranges(range_header):
-#     ranges = []
-#     if range_header:
-#         range_type, range_values = range_header.split('=')
-#         if range_type == 'bytes':
-#             for range_value in range_values.split(','):
-#                 parts = range_value.strip().split('-')
-#                 if len(parts) == 2:
-#                     start_byte, end_byte = parts
-#                     start_byte = int(start_byte) if start_byte else None
-#                     end_byte = int(end_byte) if end_byte else None
-#                     ranges.append((start_byte, end_byte))
-#                 else:
-#                     # Handle error or invalid range format
-#                     pass
-#     return ranges
-#
-#
-# def handle_multiple_range_request(access_path, range_header):
-#     file_manager = FileManager(base_path="./data")
-#     file_path = file_manager.get_full_path(access_path)
-#     file_size = os.path.getsize(file_path)
-#     ranges = parse_multiple_ranges(range_header)
-#
-#     if not ranges:
-#         return HttpResponse(416, "Range Not Satisfiable", '', None).response
-#
-#     # Handling multiple ranges
-#     boundary = str(uuid4())
-#     content_type = mimetypes.guess_type(file_path)[0] or 'application/octet-stream'
-#     multipart_content = []
-#
-#     for start_byte, end_byte in ranges:
-#         if start_byte is None or end_byte is None or start_byte > end_byte or end_byte >= file_size:
-#             continue  # Invalid range, skip it
-#
-#         with open(file_path, 'rb') as file:
-#             file.seek(start_byte)
-#             content = file.read(end_byte - start_byte + 1)
-#
-#         part_content_range = f"bytes {start_byte}-{end_byte}/{file_size}"
-#         part_headers = f"Content-Type: {content_type}\r\nContent-Range: {part_content_range}"
-#         multipart_content.append(f"--{boundary}\r\n{part_headers}\r\n\r\n{content}")
-#
-#     if not multipart_content:
-#         return HttpResponse(416, "Range Not Satisfiable", '', None).response
-#
-#     multipart_content.append(f"--{boundary}--")
-#     full_content = '\r\n'.join(multipart_content)
-#     headers = {
-#         "Content-Type": f"multipart/byteranges; boundary={boundary}",
-#         "Content-Length": str(len(full_content))
-#     }
-#
-#     return HttpResponse(206, "Partial Content", full_content, headers).response
-
-
-# def handle_multiple_range_request(file_path, range_header):
-#     # 分析 Range 头以获得多个范围
-#     ranges = parse_multiple_ranges(range_header)
-#     file_size = os.path.getsize(file_path)
-#     boundary = "--THISISMYSELFDIFINEDBOUNDARY"  # 边界字符串，可以是任意唯一字符串
-#     content_parts = []
-#
-#     for start, end in ranges:
-#         if start > end or end >= file_size:
-#             continue  # 忽略无效范围
-#
-#         # 读取并存储每个范围的内容
-#         with open(file_path, 'rb') as file:
-#             file.seek(start)
-#             content = file.read(end - start + 1)
-#             content_range_header = f"bytes {start}-{end}/{file_size}"
-#             content_parts.append((content, content_range_header))
-#
-#     # 创建多部分响应体
-#     multipart_content = create_multipart_content(content_parts, boundary)
-#
-#     # 设置响应头
-#     headers = {
-#         "Content-Type": f"multipart/byteranges; boundary={boundary}",
-#         "Content-Length": str(len(multipart_content))
-#     }
-#
-#     return HttpResponse(206, "Partial Content", multipart_content, headers).response
-#
-#
-# def create_multipart_content(content_parts, boundary):
-#     # 构建多部分响应体
-#     parts = []
-#     for content, content_range in content_parts:
-#         part = f"--{boundary}\r\n"
-#         part += "Content-Type: text/plain\r\n"
-#         part += f"Content-Range: {content_range}\r\n\r\n"
-#         part += content.decode('latin-1')  # 用 latin-1 解码二进制数据
-#         part += "\r\n"
-#         parts.append(part)
-#     parts.append(f"--{boundary}--\r\n")
-#     return "".join(parts)
-#
-#
-# def parse_multiple_ranges(range_header):
-#     # 解析多重范围
-#     _, range_values = range_header.split('=')
-#     ranges = range_values.split(',')
-#     parsed_ranges = []
-#     for range in ranges:
-#         start_str, end_str = range.split('-')
-#         start_byte = int(start_str) if start_str else None
-#         end_byte = int(end_str) if end_str else None
-#         parsed_ranges.append((start_byte, end_byte))
-#     return parsed_ranges
-
-
-# 手动解析 multipart/form-data 格式的请求主体
 def parse_multipart_body(request_body, boundary):
     parts = request_body.split(f'--{boundary}')
     form_data = {}

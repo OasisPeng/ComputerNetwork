@@ -129,10 +129,25 @@ import base64
 # r=requests.get(url=url, data=data, headers=headers)
 # print(r.content.decode())
 
-url='http://127.0.0.1:8080/client1/a.txt'
+# url='http://127.0.0.1:8080/client1/a.txt'
+#
+# data={}
+# headers={"Authorization": "Basic Y2xpZW50MToxMjM=",
+#          "Range": "bytes=0-1,1-2,2-3"}
+# r=requests.get(url=url, data=data, headers=headers)
+# print(r.content.decode())
 
-data={}
-headers={"Authorization": "Basic Y2xpZW50MToxMjM=",
-         "Range": "bytes=0-1,1-2,2-3"}
-r=requests.get(url=url, data=data, headers=headers)
+# headers = {"Authorization": "Basic Y2xpZW50MToxMjM="}
+# response = requests.get('http://localhost:8080/get_public_key', headers=headers)
+# print(response.content.decode())
+# 给我完整的回复
+
+
+
+# client = Client(server_public_key)
+url1='http://127.0.0.1:8080/?SUSTech-HTTP=1'
+
+headers={"Authorization": "Basic Y2xpZW50MToxMjM="}
+r=requests.get(url=url1, headers=headers)
+print(r)
 print(r.content.decode())

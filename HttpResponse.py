@@ -5,8 +5,6 @@ class HttpResponse:
         self.body = body
         self.headers = headers
         self.response = self.generate_response_string()
-        self.boundary = 'boundary'
-        self.multipart_respond = self.generate_multipart_body()
 
     def generate_response_string(self):
         response = f"HTTP/1.1 {self.status_code} {self.reason_phrase}\r\n"
@@ -24,7 +22,7 @@ class HttpResponse:
 
         return response
 
-    def generate_multipart_body(self):
+    def generate_multipart_respond(self):
         response = f"HTTP/1.1 {self.status_code} {self.reason_phrase}\r\n"
 
         if self.headers is not None:

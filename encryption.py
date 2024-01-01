@@ -2,12 +2,16 @@ from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.Random import get_random_bytes
 
+server_public_key = None
+
 
 class Server:
     def __init__(self):
+        global server_public_key
         key = RSA.generate(2048)
         self.private_key = key.export_key()
         self.public_key = key.publickey().export_key()
+        server_public_key = self.public_key
         self.symmetric_key = None
 
     def get_public_key(self):
