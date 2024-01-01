@@ -6,24 +6,22 @@ from encryption import Server
 
 
 def handle_client(client_socket):
-    is_gain_key = False
-    server = Server()
-    print('new client')
+    # is_gain_key = False
 
     try:
         # 处理单个客户端连接
         while True:
-            request_data = client_socket.recv(2048)
+            request_data = client_socket.recv(4096)
 
             if not request_data:
                 # 如果没有数据，客户端可能已关闭连接
                 break
 
-            if "Symmetric key post" in request_data.decode():
-                is_gain_key = True
-                # symmetric_key是request_data中的body
-                symmetric_key = request_data.decode().replace("Symmetric key post", "").split("\r\n")[-1]
-                server.receive_encrypted_symmetric_key(eval(symmetric_key))
+            # if "Symmetric key post" in request_data.decode():
+            #     is_gain_key = True
+            #     # symmetric_key是request_data中的body
+            #     symmetric_key = request_data.decode().replace("Symmetric key post", "").split("\r\n")[-1]
+            #     server.receive_encrypted_symmetric_key(eval(symmetric_key))
                 # print(symmetric_key)
 
             # 解析HTTP请求
@@ -34,12 +32,12 @@ def handle_client(client_socket):
             http_response = handle_http_request(http_request)
             print(http_response)
 
-            if is_gain_key:
+            # if is_gain_key:
                 # 将data加密
-                old_data = http_response.split("\r\n")[-1].encode()
-                old_response = http_response.split("\r\n")[:-1]
-                data = server.encrypt_message(old_data)
-                http_response = "\r\n".join(old_response) + "\r\n" + str(data)
+            # old_data = http_response.split("\r\n")[-1].encode()
+            # old_response = http_response.split("\r\n")[:-1]
+            # data = server.encrypt_message(old_data)
+            # http_response = "\r\n".join(old_response) + "\r\n" + str(data)
 
             # 发送HTTP响应到客户端
             client_socket.send(http_response.encode('utf-8'))
@@ -72,6 +70,7 @@ def run_server(host, port):
     try:
         while True:
             client_socket, addr = server_socket.accept()
+            # client_socket.recv(2048)
             print(client_socket)  # 一个连接
             print(f"Accepted connection from {addr[0]}:{addr[1]}")
 

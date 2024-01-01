@@ -1,3 +1,6 @@
+from encryption import Server
+
+
 class HttpResponse:
     def __init__(self, status_code, reason_phrase, body=None, headers=None):
         self.status_code = status_code
@@ -18,12 +21,16 @@ class HttpResponse:
             response += f"Connection: keep-alive\r\nAccess-Control-Allow-Origin: " \
                         f"http://localhost:8080\r\nContent-Length: {len(self.body)}\r\n\r\n"
 
-            for body in self.body:
-                # 如果body是str
-                if type(body) == str:
-                    response += body
-                else:
-                    response += body.decode()
+            if type(self.body) == str:
+                body = self.body
+            elif type(self.body) == list:
+                body = ""
+                for i in range(len(self.body)):
+                    body += self.body[i].decode()
+            else:
+                body = self.body.decode()
+            # response += str(Server().encrypt_message(body.encode()))
+            response += body
         else:
             response += "\r\n"
 
