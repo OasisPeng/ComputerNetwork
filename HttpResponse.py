@@ -17,15 +17,15 @@ class HttpResponse:
             # 注意：此处不再需要发送body内容，因为在分块传输中，内容将在之后发送
             response += f"Connection: keep-alive\r\nAccess-Control-Allow-Origin: " \
                         f"http://localhost:8080\r\nContent-Length: {len(self.body)}\r\n\r\n"
+
+            for body in self.body:
+                # 如果body是str
+                if type(body) == str:
+                    response += body
+                else:
+                    response += body.decode()
         else:
             response += "\r\n"
-
-        for body in self.body:
-            # 如果body是str
-            if type(body) == str:
-                response += body
-            else:
-                response += body.decode()
 
         return response
 

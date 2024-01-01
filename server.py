@@ -8,26 +8,22 @@ from encryption import Server
 def handle_client(client_socket):
     is_gain_key = False
     server = Server()
-    symmetric_key = None
 
     try:
         # 处理单个客户端连接
         while True:
-            request_data = client_socket.recv(1024)
+            request_data = client_socket.recv(2048)
 
             if not request_data:
                 # 如果没有数据，客户端可能已关闭连接
                 break
 
-            if "Symmetric key post" in request_data.decode('utf-8'):
+            if "Symmetric key post" in request_data.decode():
                 is_gain_key = True
                 # symmetric_key是request_data中的body
-                symmetric_key = request_data.decode('utf-8').replace("Symmetric key post", "")
-                server.receive_encrypted_symmetric_key(symmetric_key)
-                continue
-
-            if is_gain_key:
-                request_data = server.decrypt_message(request_data)
+                symmetric_key = request_data.decode().replace("Symmetric key post", "").split("\r\n")[-1]
+                server.receive_encrypted_symmetric_key(eval(symmetric_key))
+                print(symmetric_key)
 
             # 解析HTTP请求
             http_request = request_data.decode('utf-8')
@@ -36,6 +32,13 @@ def handle_client(client_socket):
             # 处理HTTP请求并获取响应
             http_response = handle_http_request(http_request)
             print(http_response)
+
+            if is_gain_key:
+                # 将data加密
+                old_data = http_response.split("\r\n")[-1].encode()
+                old_response = http_response.split("\r\n")[:-1]
+                data = server.encrypt_message(old_data)
+                http_response = "\r\n".join(old_response) + "\r\n" + str(data)
 
             # 发送HTTP响应到客户端
             client_socket.send(http_response.encode('utf-8'))
@@ -62,8 +65,6 @@ def run_server(host, port):
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.bind((host, port))
     server_socket.listen(5)
-
-    Server().get_keys()
 
     print(f"Server listening on {host}:{port}")
 
