@@ -7,14 +7,17 @@ server_public_key = None
 
 class Server:
     def __init__(self):
-        global server_public_key
+        self.symmetric_key = None
         key = RSA.generate(2048)
         self.private_key = key.export_key()
-        self.public_key = key.publickey().export_key()
-        server_public_key = self.public_key
-        self.symmetric_key = None
 
-    def get_public_key(self):
+    def get_keys(self):
+        global server_public_key
+        key = RSA.generate(2048)
+        self.public_key = key.publickey().export_key()
+        self.private_key = key.export_key()
+        server_public_key = self.public_key
+
         return self.public_key
 
     def receive_encrypted_symmetric_key(self, encrypted_key):
@@ -64,7 +67,7 @@ if __name__ == "__main__":
     server = Server()
 
     # Simulate client requesting the public key from the server
-    server_public_key = server.get_public_key()
+    server_public_key = server.get_keys()
 
     # Create a client instance with the server's public key
     client = Client(server_public_key)

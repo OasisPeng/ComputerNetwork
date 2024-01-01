@@ -20,6 +20,13 @@ class HttpResponse:
         else:
             response += "\r\n"
 
+        for body in self.body:
+            # 如果body是str
+            if type(body) == str:
+                response += body
+            else:
+                response += body.decode()
+
         return response
 
     def generate_multipart_respond(self):

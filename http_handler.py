@@ -108,8 +108,8 @@ def handle_get_request(request_path, request_lines, new_session_id):
         return HttpResponse(405, "Method Not Allowed", '', head).response
     elif 'get_public_key' in request_path:
         # 返回服务器的公钥
-        return HttpResponse(200, "OK", str(encryption.server_public_key), head).response + str(
-            encryption.server_public_key) + '\r\n'
+        return HttpResponse(200, "OK", encryption.server_public_key, head).response + str(
+            encryption.server_public_key)
         # 检查路径并执行相应的操作
     try:
         access_path = urllib.parse.unquote(urllib.parse.urlparse(request_path).path)[1:]
@@ -128,7 +128,6 @@ def handle_get_request(request_path, request_lines, new_session_id):
         # List items in the directory
         if sustech_http_param == "1":
             items = file_manager.list_directory(access_path)
-            print(items + '\r\n' + str(items))
             return HttpResponse(200, "OK", str(items), head).response
         elif query_params == {} or sustech_http_param == '0':  # 没有参数
             # Show HTML page with file tree
@@ -247,6 +246,10 @@ def handle_post_request(request_path, username, http_request, new_session_id):
         return handle_upload_request(request_path, username, http_request, head)
     elif request_path.startswith("/delete"):
         return handle_delete_request(request_path, username, head)
+    elif request_path.startswith("/send_symmetric_key"):
+        # 解码http_request并储存为symmetric_key
+        return HttpResponse(200, "OK", "Symmetric key received",
+                            head).response + "Symmetric key received"
     else:
         # 如果不是上传请求，返回 405 Method Not Allowed
         return HttpResponse(405, "Method Not Allowed", '', head).response

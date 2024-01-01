@@ -4,10 +4,12 @@ import argparse
 from http_handler import handle_http_request
 from encryption import Server
 
-server_public_key = None
-
 
 def handle_client(client_socket):
+    is_gain_key = False
+    server = Server()
+    symmetric_key = None
+
     try:
         # 处理单个客户端连接
         while True:
@@ -16,6 +18,16 @@ def handle_client(client_socket):
             if not request_data:
                 # 如果没有数据，客户端可能已关闭连接
                 break
+
+            if "Symmetric key post" in request_data.decode('utf-8'):
+                is_gain_key = True
+                # symmetric_key是request_data中的body
+                symmetric_key = request_data.decode('utf-8').replace("Symmetric key post", "")
+                server.receive_encrypted_symmetric_key(symmetric_key)
+                continue
+
+            if is_gain_key:
+                request_data = server.decrypt_message(request_data)
 
             # 解析HTTP请求
             http_request = request_data.decode('utf-8')
@@ -46,13 +58,12 @@ def handle_client(client_socket):
 
 
 def run_server(host, port):
-    global server_public_key
     # 启动HTTP服务器
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.bind((host, port))
     server_socket.listen(5)
 
-    Server()
+    Server().get_keys()
 
     print(f"Server listening on {host}:{port}")
 
