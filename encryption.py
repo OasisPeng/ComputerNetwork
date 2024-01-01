@@ -20,7 +20,7 @@ class Server:
         self.symmetric_key = None
 
     def get_keys(self):
-        global server_public_key, private_key
+        global server_public_key
         # key = RSA.generate(2048)
         # private_key = key.export_key()
         # print(private_key)
@@ -30,8 +30,8 @@ class Server:
 
     def receive_encrypted_symmetric_key(self, encrypted_key):
         global private_key
-        private_key = RSA.import_key(private_key)
-        cipher_rsa = PKCS1_OAEP.new(private_key)
+        private_key_ = RSA.import_key(private_key)
+        cipher_rsa = PKCS1_OAEP.new(private_key_)
         self.symmetric_key = cipher_rsa.decrypt(encrypted_key)
 
     def decrypt_message(self, encrypted_data):

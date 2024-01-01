@@ -8,6 +8,7 @@ from encryption import Server
 def handle_client(client_socket):
     is_gain_key = False
     server = Server()
+    print('new client')
 
     try:
         # 处理单个客户端连接
@@ -23,7 +24,7 @@ def handle_client(client_socket):
                 # symmetric_key是request_data中的body
                 symmetric_key = request_data.decode().replace("Symmetric key post", "").split("\r\n")[-1]
                 server.receive_encrypted_symmetric_key(eval(symmetric_key))
-                print(symmetric_key)
+                # print(symmetric_key)
 
             # 解析HTTP请求
             http_request = request_data.decode('utf-8')
