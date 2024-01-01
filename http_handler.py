@@ -471,7 +471,7 @@ def parse_query_string(request_path):
 
 def parse_request_path(request_path):
     # 检查是否存在查询参数
-    if '/?' in request_path:
+    if '?' in request_path:
         path_without_query = request_path.split('?')[0]
     else:
         path_without_query = request_path
