@@ -1,11 +1,10 @@
 import os
 import mimetypes
 import base64
-import urllib.parse
+import argparse
 import uuid
 import encryption
 from uuid import uuid4
-
 from HttpRequest import HttpRequest
 from HttpResponse import HttpResponse
 # from io import BytesIO
@@ -68,7 +67,7 @@ def handle_http_request(http_request):
             return HttpResponse(405, "Method Not Allowed", '', None).response
     # cookie无效或过期
     else:
-        return HttpResponse(401, "Unauthorized", login_page(),
+        return HttpResponse(401, "Unauthorized", '',
                             headers={"WWW-Authenticate": 'Basic realm="Authorization '
                                                          'Required"'}).response
 
@@ -111,7 +110,7 @@ def handle_get_request(request_path, request_lines, new_session_id):
         return HttpResponse(200, "OK", str(encryption.server_public_key), head).response
         # 检查路径并执行相应的操作
     try:
-        access_path = urllib.parse.unquote(urllib.parse.urlparse(request_path).path)[1:]
+        access_path = parse_request_path(request_path)
     except UnicodeDecodeError:
         return HttpResponse(400, "Bad Request", '', head).response
 
@@ -121,7 +120,7 @@ def handle_get_request(request_path, request_lines, new_session_id):
     # 如果是目录，则列出目录内容
     if file_manager.is_directory(access_path):
         # Check for the SUSTech-HTTP query parameter
-        query_params = urllib.parse.parse_qs(urllib.parse.urlparse(request_path).query)
+        query_params = parse_query_string(request_path)
         sustech_http_param = query_params.get("SUSTech-HTTP", ["0"])[0]
 
         # List items in the directory
@@ -137,7 +136,7 @@ def handle_get_request(request_path, request_lines, new_session_id):
 
     # 如果是文件，传输文件内容
     elif file_manager.is_file(access_path):
-        query_params = urllib.parse.parse_qs(urllib.parse.urlparse(request_path).query)
+        query_params = parse_query_string(request_path)
         chunk_param = query_params.get("chunked", ["0"])[0]
         # 检查是否有 Range 请求头
         range_header = get_range_header(request_lines)
@@ -222,7 +221,7 @@ def handle_head_request(request_path, new_session_id):
     else:
         head = None
 
-    access_path = urllib.parse.unquote(urllib.parse.urlparse(request_path).path)[1:]
+    access_path = parse_request_path(request_path)
     if access_path != '' and (request_path.startswith("/upload") or request_path.startswith("/delete") or FileManager(
             base_path="./data").is_file(access_path) or FileManager(base_path="./data").is_directory(access_path)):
         return HttpResponse(405, "Method Not Allowed", '', head).response
@@ -256,10 +255,10 @@ def handle_post_request(request_path, username, http_request, new_session_id):
 
 def handle_upload_request(request_path, username, http_request, head):
     # 获取上传目录路径
-    query_param = urllib.parse.parse_qs(urllib.parse.urlparse(request_path).query)
+    query_param = parse_query_string(request_path)
     if query_param == {}:
         return HttpResponse(400, "Bad Request", '', head).response
-    upload_path = query_param.get("path", None)[0]
+    upload_path = query_param.get("path", None)
     if upload_path is None:
         return HttpResponse(400, "Bad Request", '', head).response
 
@@ -307,10 +306,10 @@ def handle_upload_request(request_path, username, http_request, head):
 def handle_delete_request(request_path, username, head):
     # 获取删除文件的路径
 
-    query_param = urllib.parse.parse_qs(urllib.parse.urlparse(request_path).query)
+    query_param = parse_query_string(request_path)
     if query_param == {}:
         return HttpResponse(400, "Bad Request", '', head).response
-    delete_path = query_param.get("path", None)[0]
+    delete_path = query_param.get("path", None)
     if delete_path is None:
         return HttpResponse(400, "Bad Request", '', head).response
 
@@ -446,31 +445,43 @@ def parse_content_disposition(content_disposition):
     for part in parts[1:]:
         key, value = part.strip().split('=')
         if key == 'name':
-            name = urllib.parse.unquote(value.strip('\"'))
+            name = unquote(value.strip('\"'))
         elif key == 'filename':
-            filename = urllib.parse.unquote(value.strip('\"'))
+            filename = unquote(value.strip('\"'))
 
     return disposition, name, filename
 
 
-def login_page():
-    return """
-    <html>
-    <head>
-        <title>Login Page</title>
-    </head>
-    <body>
-        <h2>Login</h2>
-        <form method="post" action="/login">
-            <label for="username">Username:</label>
-            <input type="text" id="username" name="username" required><br>
-            <label for="password">Password:</label>
-            <input type="password" id="password" name="password" required><br>
-            <input type="submit" value="Login">
-        </form>
-    </body>
-    </html>
-    """
+def unquote(value):
+    # 手动解码URL编码
+    return argparse.Namespace(quoted=value,
+                              unquoted=value.encode('utf-8').decode('unicode_escape')) if '%' in value else value
+
+
+def parse_query_string(request_path):
+    query_params = {}
+    if '?' in request_path:
+        query_string = request_path.split('?')[-1]
+        pairs = query_string.split('&')
+        for pair in pairs:
+            key, value = pair.split('=')
+            query_params[key] = value
+    return query_params
+
+
+def parse_request_path(request_path):
+    # 检查是否存在查询参数
+    if '/?' in request_path:
+        path_without_query = request_path.split('?')[0]
+    else:
+        path_without_query = request_path
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('path')
+    args = parser.parse_args([path_without_query])
+
+    # 返回路径，排除查询参数
+    return args.path[1:]
 
 
 if __name__ == "__main__":
