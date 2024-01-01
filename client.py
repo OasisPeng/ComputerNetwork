@@ -30,24 +30,24 @@ import requests
 import base64
 
 # 你的服务器地址
-server_url = 'http://localhost:8080/delete?path=client1'
-
-# 你的用户名和密码
-username = 'client1'
-password = '123'
-
-# 构建认证信息
-auth_info = f"{username}:{password}"
-encoded_auth_info = base64.b64encode(auth_info.encode()).decode('utf-8')
-headers = {'Authorization': f'Basic {encoded_auth_info}',
-           # 'Cookie': 'session-id=1c36a689-c66a-4e38-ac43-9bda3d174352; HttpOnly'
-           }
-
-# 发送 POST 请求
-response = requests.post(server_url, headers=headers)
-
-# 打印响应内容
-print(response.text)
+# server_url = 'http://localhost:8080/delete?path=client1'
+#
+# # 你的用户名和密码
+# username = 'client1'
+# password = '123'
+#
+# # 构建认证信息
+# auth_info = f"{username}:{password}"
+# encoded_auth_info = base64.b64encode(auth_info.encode()).decode('utf-8')
+# headers = {'Authorization': f'Basic {encoded_auth_info}',
+#            # 'Cookie': 'session-id=1c36a689-c66a-4e38-ac43-9bda3d174352; HttpOnly'
+#            }
+#
+# # 发送 POST 请求
+# response = requests.post(server_url, headers=headers)
+#
+# # 打印响应内容
+# print(response.text)
 
 
 # ################# 测试持久连接
@@ -81,3 +81,58 @@ print(response.text)
 # q = requests.get('http://localhost:8080/', headers=headers)
 # print(q.text)
 # print(q)
+# import requests
+#
+#
+# def test_chunked_transfer(server_url, username, password):
+#     # Construct authorization information
+#     auth_info = f"{username}:{password}"
+#     encoded_auth_info = base64.b64encode(auth_info.encode()).decode('utf-8')
+#     headers = {
+#         'Authorization': f'Basic {encoded_auth_info}',
+#         'Accept-Encoding': 'chunked'
+#     }
+#
+#     # Sending GET request with chunked transfer
+#     response = requests.get(server_url, headers=headers, stream=True)
+#     print(response.text)
+#
+#     # Check if the server response is chunked
+#     if response.headers.get('Transfer-Encoding') == 'chunked':
+#         print("Chunked transfer encoding detected. Reading chunks:")
+#
+#         # Read the response in chunks
+#         for chunk in response.iter_content(chunk_size=1024):
+#             if chunk:  # filter out keep-alive new chunks
+#                 print(chunk)
+#     else:
+#         print("Server did not use chunked transfer encoding.")
+#
+#     return response
+#
+#
+# if __name__ == "__main__":
+#     # Your server URL with chunked parameter
+#     server_url = 'http://localhost:8080/example.txt?chunked=1'
+#
+#     # Your username and password
+#     username = 'client1'
+#     password = '123'
+#
+#     # Test chunked transfer
+#     test_chunked_transfer(server_url, username, password)
+# url='http://127.0.0.1:8080/client1/a.txt'
+#
+# data={}
+# headers={"Authorization": "Basic Y2xpZW50MToxMjM=",
+#          "Range": "bytes=2-3"}
+# r=requests.get(url=url, data=data, headers=headers)
+# print(r.content.decode())
+
+url='http://127.0.0.1:8080/client1/a.txt'
+
+data={}
+headers={"Authorization": "Basic Y2xpZW50MToxMjM=",
+         "Range": "bytes=0-1,1-2,2-3"}
+r=requests.get(url=url, data=data, headers=headers)
+print(r.content.decode())
